@@ -1,0 +1,117 @@
+services:
+  ### --- Databases : ---
+  # User DB
+  user_db:
+    image: postgres:latest
+    container_name: user_db_postgres
+    ports:
+      - 5432:5432
+    networks:
+      - kafka_network
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGDATA: /data/postgres
+      POSTGRES_DB: user_db
+    volumes:
+      - user_db:/data/postgres
+    restart: unless-stopped
+  # Perfs DB - pour l'historique RAM/CPU + metrics des modèles
+  perfs_db:
+    image: postgres:latest
+    container_name: perfs_db_postgres
+    ports:
+      - 5433:5432
+    networks:
+      - kafka_network
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGDATA: /data/postgres
+      POSTGRES_DB: perfs_db
+    volumes:
+      - perfs_db:/data/postgres
+    restart: unless-stopped
+
+
+
+  ### --- Services : ---
+  # Service Authentification :
+  auth_service:
+    build:
+      context: ./auth_service
+      dockerfile: Dockerfile
+    container_name: auth_service
+    ports:
+      - 8002:8002
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: user_db
+    restart: unless-stopped
+    networks:
+      - kafka_network
+    volumes:
+      - ./auth_service:/app
+  # Service Leaderboard : 
+  leaderboard_service:
+    build:
+      context: ./leaderboard_service
+      dockerfile: Dockerfile
+    container_name: leaderboard_service
+    ports:
+      - 8003:8003
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: perfs_db
+    restart: unless-stopped
+    networks:
+      - kafka_network
+    volumes:
+      - ./leaderboard_service:/app
+
+  ### --- Kafka : ---
+  kafka:    
+    container_name: kafka_broker
+    image: apache/kafka:latest
+    ports:
+      - 9092:9092
+    networks:
+      - kafka_network
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://kafka:9092,CONTROLLER://kafka:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_NUM_PARTITIONS: 3
+    volumes:
+      - kafka_data:/tmp/kraft-storage
+    restart: unless-stopped
+  kafbat-ui:
+    container_name: kafbat-ui
+    image: ghcr.io/kafbat/kafka-ui:latest
+    ports:
+      - 8080:8080
+    environment:
+      DYNAMIC_CONFIG_ENABLED: 'true'
+
+
+
+# Networks :
+networks:
+  kafka_network:
+    driver: bridge
+
+# Volumes :
+volumes:
+  user_db: 
+  perfs_db:
+  kafka_data: 

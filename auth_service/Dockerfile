@@ -1,0 +1,18 @@
+FROM python:3.10-slim
+
+# RUN apt-get update
+# RUN apt-get install -y --no-install-recommends gcc postgresql-client
+
+# On retire les fichiers temporaires :
+RUN rm -rf /var/lib/apt/lists/* 
+
+WORKDIR /app
+
+COPY ./requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+EXPOSE 8002
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8002"]
