@@ -26,6 +26,14 @@ docker container prune
 ```
 docker volume prune
 ```
+- Remove all containers and volumes : 
+```
+docker rm -vf $(docker ps -aq)
+```
+- Remove all images : 
+```
+docker rmi -f $(docker images -aq)
+```
 
 - Liste des clusters :
 ```
